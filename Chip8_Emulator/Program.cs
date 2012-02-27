@@ -11,6 +11,10 @@ namespace ConsoleApplication1
         {
             Chip8 chip8 = new Chip8();
 
+            // load the pong ROM file into the emulator
+            System.IO.FileInfo finf = new System.IO.FileInfo(System.IO.Directory.GetCurrentDirectory() + "/roms/pong.ch8");
+            chip8.LoadRom(finf);
+
             for (; ; )
             {
                 chip8.EmulateCycle();

@@ -23,7 +23,7 @@ namespace ConsoleApplication1
         /// <summary>
         /// Memory
         /// </summary>
-        protected int[] memory = new int[4096];
+        protected byte[] memory = new byte[4096];
 
         /// <summary>
         /// Current opcode
@@ -181,5 +181,26 @@ namespace ConsoleApplication1
             this.opcode = op1 | op2;
         }
 
+        /// <summary>
+        /// Loads a ROM file into the memory bytearray
+        /// </summary>
+        /// <param name="romFile">path to the ROM file</param>
+        /// <returns></returns>
+        public Boolean LoadRom(System.IO.FileInfo romFile)
+        {
+            System.IO.FileStream fs = romFile.OpenRead();
+
+            int offset = 0;
+            int remaining = (int)fs.Length;
+
+            while(remaining > 0)
+            {
+                int read = fs.Read(this.memory, offset, remaining);
+                remaining -= read;
+                offset += read;
+            }
+
+            return true;
+        }
     }
 }
