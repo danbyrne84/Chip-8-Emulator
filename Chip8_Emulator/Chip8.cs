@@ -33,7 +33,7 @@ namespace ConsoleApplication1
         /// <summary>
         /// CPU registers starting from V0 to VE. 16th register is carry flag.
         /// </summary>
-        protected char[] v = new char[16];
+        protected int[] v = new int[16];
 
         /// <summary>
         /// Index register
@@ -48,7 +48,7 @@ namespace ConsoleApplication1
         /// <summary>
         /// Graphics array contains grid of pixels 64*32
         /// </summary>
-        protected char[,] gfx = new char[64, 32];
+        protected byte[,] gfx = new byte[64, 32];
 
         /// <summary>
         /// Delay timer
@@ -63,7 +63,7 @@ namespace ConsoleApplication1
         /// <summary>
         /// The stack
         /// </summary>
-        protected int[] stack = new int[16];
+        protected List<int> stack = new List<int>();
 
         /// <summary>
         /// The stack pointer
@@ -81,8 +81,8 @@ namespace ConsoleApplication1
         public Chip8()
         {
             // lets plant some instructions into the chip 8 memory
-            this.memory[0x200] = 0xA2;
-            this.memory[0x201] = 0xF0;
+            // this.memory[0x200] = 0xA2;
+            // this.memory[0x201] = 0xF0;
 
             this.i = 0;
             this.stackPointer = 0;
@@ -109,62 +109,76 @@ namespace ConsoleApplication1
         {
             int opCode = this.opcode;
 
-            switch (opCode)
+            if (opCode == 0)
             {
-                case 0x00E0:
+                Console.WriteLine("END");
+            }
+
+            string hex = opCode.ToString("X");
+            Console.WriteLine("Executing opcode: " + hex);
+            char first = hex[0];
+
+            int register;
+            int value;
+
+            switch (first)
+            {
+                case '6': // load value into register
+                    register = int.Parse(hex[1].ToString(), System.Globalization.NumberStyles.HexNumber);
+                    value = int.Parse(String.Concat(hex[2],hex[3]), System.Globalization.NumberStyles.HexNumber);
+                    this.loadValue(register, value);
+                break;
+                case 'A': // load value into index register
+                    value = int.Parse(String.Concat(hex[1],hex[2],hex[3]), System.Globalization.NumberStyles.HexNumber);
+                    this.loadIndex(value);
+                break;
+                case 'D': // draw sprite
+                    int x = int.Parse(hex[1].ToString(), System.Globalization.NumberStyles.HexNumber);
+                    int y = int.Parse(hex[2].ToString(), System.Globalization.NumberStyles.HexNumber);
+                    int nibble = int.Parse(hex[3].ToString(), System.Globalization.NumberStyles.HexNumber);
+                    this.drawSprite(x, y, nibble);
+                break;
+
+                /**
+                case '0x00E0': // @todo moves
                     // clear the screen, just reset the array of pixels
                     this.gfx = new char[64, 32];
                     break;
-                case 0x0:
-                    // return from subroutine call
+                 **/
+                case '0':
+                // return from subroutine call
+                case '1':
+                // jump to address 
                     break;
-                case 0x1:
-                    // jump to address 
-                    break;
-                case 0x2:
-                    // call a subroutine
-                    break;
-                case 0x3:
-                    // skip if equal
-                    break;
-                case 0x4:
-                    // skip if not equal
-                    break;
-                case 0x5:
-                    // skip if register is equal
-                    break;
-                case 0x6:
-                    // load value
-                    break;
-                case 0x7:
+                case '2':
+                // call a subroutine
+                    this.stackPointer++;
+                    this.stack.Add(this.pc);
+                    this.pc = int.Parse(String.Concat(hex[1], hex[2], hex[3]), System.Globalization.NumberStyles.HexNumber);
+                break;
+                case '3':
+                // skip if equal
+                case '4':
+                // skip if not equal
+                case '5':
+                // skip if register is equal
+
+                case '7':
                     // add value
-                    break;
-                case 0x8:
+                case '8':
                     // math.... to be expanded
-                    break;
-                case 0x9:
+                case '9':
                     // skip if register not equal
-                    break;
-                case 0xA:
-                    // load value into index register
-                    break;
-                case 0xB:
+                case 'B':
                     // jump to address plus register 0
-                    break;
-                case 0xC:
+                case 'C':
                     // random (register VX = random number AND KK)
-                    break;
-                case 0xD:
-                    // draw sprite
-                    break;
-                case 0xE:
+                case 'E':
                     // skip if key is pressed/not pressedd
-                    break;
-                case 0xF:
+                case 'F':
                     // timing... and stuff...
-                    break;
                 default:
-                    throw new Exception("Opcode " + opCode + " not recognised");
+                    throw new Exception("Opcode " + hex + " not recognised");
             }
         }
 
@@ -178,6 +192,8 @@ namespace ConsoleApplication1
             int op1 = this.memory[this.pc] << 8;
             int op2 = this.memory[this.pc + 1];
 
+            this.pc = this.pc + 2;
+            
             this.opcode = op1 | op2;
         }
 
@@ -190,10 +206,10 @@ namespace ConsoleApplication1
         {
             System.IO.FileStream fs = romFile.OpenRead();
 
-            int offset = 0;
+            int offset = 512; // 0x200 - start of working RAM
             int remaining = (int)fs.Length;
 
-            while(remaining > 0)
+            while (remaining > 0)
             {
                 int read = fs.Read(this.memory, offset, remaining);
                 remaining -= read;
@@ -202,5 +218,28 @@ namespace ConsoleApplication1
 
             return true;
         }
+
+        /**
+         * Load a valid into the given register
+         */
+        protected void loadValue(int Register, int value)
+        {
+            this.v[Register] = value;
+        }
+
+        protected void loadIndex(int value)
+        {
+            this.i = value;
+        }
+
+        protected void drawSprite(int x, int y, int nibble)
+        {
+            // read nibble bytes from memory starting at location stored in index register
+            ArraySegment<byte> sprite = new ArraySegment<byte>(this.memory, this.i, nibble);
+            
+            // copy the array segment into the graphics buffer
+
+        }
+
     }
 }
