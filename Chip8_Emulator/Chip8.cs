@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Collections;
+using System.Diagnostics;
 
 namespace ConsoleApplication1
 {
@@ -48,7 +50,7 @@ namespace ConsoleApplication1
         /// <summary>
         /// Graphics array contains grid of pixels 64*32
         /// </summary>
-        protected byte[,] gfx = new byte[64, 32];
+        protected bool[,] gfx = new bool[64, 32];
 
         /// <summary>
         /// Delay timer
@@ -80,10 +82,6 @@ namespace ConsoleApplication1
         /// </summary>
         public Chip8()
         {
-            // lets plant some instructions into the chip 8 memory
-            // this.memory[0x200] = 0xA2;
-            // this.memory[0x201] = 0xF0;
-
             this.i = 0;
             this.stackPointer = 0;
 
@@ -93,6 +91,7 @@ namespace ConsoleApplication1
 
         /// <summary>
         /// Emulate a cycle of the Chip8 CPU
+        /// Fetch, Execute, Update Timers, Update Display
         /// </summary>
         public void EmulateCycle()
         {
@@ -103,19 +102,25 @@ namespace ConsoleApplication1
             this.ExecuteOpcode();
 
             // Update Timers
+
+            // Update Display
+            this.UpdateDisplay();
+
+            // Just slow down a little sparky
+            System.Threading.Thread.Sleep(100);
         }
 
+        /// <summary>
+        /// Execute the current OpCode
+        /// Contains switch statement of doom, and poor treatment of hexadecimals!
+        /// </summary>
         protected void ExecuteOpcode()
         {
             int opCode = this.opcode;
 
-            if (opCode == 0)
-            {
-                Console.WriteLine("END");
-            }
-
             string hex = opCode.ToString("X");
-            Console.WriteLine("Executing opcode: " + hex);
+            Debug.Print("Executing opcode: " + hex);
+
             char first = hex[0];
 
             int register;
@@ -135,9 +140,17 @@ namespace ConsoleApplication1
                 case 'D': // draw sprite
                     int x = int.Parse(hex[1].ToString(), System.Globalization.NumberStyles.HexNumber);
                     int y = int.Parse(hex[2].ToString(), System.Globalization.NumberStyles.HexNumber);
+
+                    int xPos = this.v[x];
+                    int yPos = this.v[y];
+
                     int nibble = int.Parse(hex[3].ToString(), System.Globalization.NumberStyles.HexNumber);
-                    this.drawSprite(x, y, nibble);
+                    this.drawSprite(xPos, yPos, nibble);
                 break;
+                case 'E':
+                    // skip if key is pressed/not pressed
+                break;
+                
 
                 /**
                 case '0x00E0': // @todo moves
@@ -145,36 +158,38 @@ namespace ConsoleApplication1
                     this.gfx = new char[64, 32];
                     break;
                  **/
-                case '0':
-                // return from subroutine call
-                case '1':
-                // jump to address 
-                    break;
                 case '2':
-                // call a subroutine
+                    // call a subroutine
                     this.stackPointer++;
                     this.stack.Add(this.pc);
                     this.pc = int.Parse(String.Concat(hex[1], hex[2], hex[3]), System.Globalization.NumberStyles.HexNumber);
                 break;
+                case '7':
+                    // add value
+                    this.addValue(int.Parse((String)hex[1].ToString(), System.Globalization.NumberStyles.HexNumber), int.Parse(String.Concat(hex[2], hex[3]), System.Globalization.NumberStyles.HexNumber));
+                break;
+
+                case '0':
+                // return from subroutine call
+                case '1':
+                    // jump to address 
+                    this.pc = int.Parse(String.Concat(hex[1], hex[2], hex[3]), System.Globalization.NumberStyles.HexNumber);
+                    break;
                 case '3':
                 // skip if equal
                 case '4':
                 // skip if not equal
                 case '5':
                 // skip if register is equal
-
-                case '7':
-                    // add value
                 case '8':
-                    // math.... to be expanded
+                    // 8XY4
+                    // ADD Value of register Y to value of register X 
                 case '9':
                     // skip if register not equal
                 case 'B':
                     // jump to address plus register 0
                 case 'C':
                     // random (register VX = random number AND KK)
-                case 'E':
-                    // skip if key is pressed/not pressedd
                 case 'F':
                     // timing... and stuff...
                 default:
@@ -219,26 +234,109 @@ namespace ConsoleApplication1
             return true;
         }
 
-        /**
-         * Load a valid into the given register
-         */
+        /// <summary>
+        /// Add value inVal to Register
+        /// Value wraps around if greater than 255
+        /// </summary>
+        /// <param name="Register"></param>
+        /// <param name="inVal"></param>
+        protected void addValue(int Register, int inVal)
+        {
+            int val;
+
+            if ((val = this.v[Register] + inVal) > 255)
+            {
+                val -= 256;
+            }
+            this.v[Register] = val;
+
+            Debug.WriteLine("ADDV [" + Register + "] with [" + inVal + "] = [" + val + "]");
+        }
+
+        /// <summary>
+        /// Load a value into the given register
+        /// </summary>
+        /// <param name="Register"></param>
+        /// <param name="value"></param>
         protected void loadValue(int Register, int value)
         {
+            Debug.Print("LDV [" + Register + "] with [" + value + "]");
             this.v[Register] = value;
         }
 
+        /// <summary>
+        /// Load the index register with the given value
+        /// </summary>
+        /// <param name="value"></param>
         protected void loadIndex(int value)
         {
+            Debug.Print("LDI [" + value + "]");
             this.i = value;
         }
 
+        /// <summary>
+        /// Draw a sprite to the 'screen' (graphics array)
+        /// </summary>
+        /// <param name="x">X co-ordinate</param>
+        /// <param name="y">Y co-ordinate</param>
+        /// <param name="nibble">pixel height of the sprite</param>
         protected void drawSprite(int x, int y, int nibble)
         {
-            // read nibble bytes from memory starting at location stored in index register
-            ArraySegment<byte> sprite = new ArraySegment<byte>(this.memory, this.i, nibble);
-            
-            // copy the array segment into the graphics buffer
+            Debug.WriteLine("X Coordinate: [{0}] , Y Coordinate: [{1}]", x, y);
+ 
+            for (int lines = 0; lines < nibble; lines++)
+            {
+                Byte sprite = this.memory[this.i + lines];
+                String byteString = Convert.ToString(sprite, 2).PadLeft(8, '0');
 
+                // for each bit in the byte
+                for (int i = 0; i < 8; i++)
+                {
+                    bool bit = (byteString[i] == '1') ? true : false;
+                    bool existingVal = this.gfx[x + i, y + lines];
+
+                    //XOR operator to detect 'collisions'
+                    this.gfx[x + i, y + lines] = existingVal ^ bit;
+                }
+            }           
+        }
+
+        /// <summary>
+        /// This is one ugly ass method
+        /// Update the console with pixels from the gfx array
+        /// </summary>
+        protected void UpdateDisplay()
+        {
+            Console.OutputEncoding = System.Text.Encoding.GetEncoding(1252);
+            System.Console.Clear();
+            char block = '*';
+
+            for (int xPos = 0; xPos < 64; xPos++)
+            {
+                Console.Write(block);
+            }
+            Console.WriteLine();
+
+            for (int yPos = 0; yPos < 32; yPos++)
+            {
+                for(int xPos = 0; xPos < 64; xPos++)
+                {
+                    if (xPos == 0 || xPos == 63)
+                    {
+                        Console.Write(block);
+                    }
+
+                    char val = (this.gfx[xPos, yPos] == true) ? block : ' ';
+                    System.Console.Write(val);
+                }
+                Console.WriteLine();
+            }
+
+            for (int xPos = 0; xPos < 64; xPos++)
+            {
+                Console.Write(block);
+            }
+            Console.WriteLine();
         }
 
     }

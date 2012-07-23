@@ -1,0 +1,5 @@
+C:\Users\Dan\Documents\GitHub\Chip-8-Emulator\Chip8_Emulator\obj\x86\Debug\Chip8_Emulator.exe
+C:\Users\Dan\Documents\GitHub\Chip-8-Emulator\Chip8_Emulator\obj\x86\Debug\Chip8_Emulator.pdb
+C:\Users\Dan\Documents\GitHub\Chip-8-Emulator\Chip8_Emulator\bin\Debug\Chip8_Emulator.exe
+C:\Users\Dan\Documents\GitHub\Chip-8-Emulator\Chip8_Emulator\bin\Debug\Chip8_Emulator.pdb
+C:\Users\Dan\Documents\GitHub\Chip-8-Emulator\Chip8_Emulator\obj\x86\Debug\ResolveAssemblyReference.cache
